@@ -1,7 +1,7 @@
 # Frontline: Design Spec
 
 Date: 2026-09-24
-Status: Draft, pending review
+Status: Approved; rules tuned during the build (see "Tuning" below)
 Replaces: Live Arena (`2026-09-24-live-arena-design.md`)
 
 ## Problem
@@ -43,7 +43,7 @@ revealed together.
 | Timing | Simultaneous rounds: all orders are hidden, then revealed together |
 | Orders per round | One per player: attack, or reinforce |
 | Combat | Deterministic troop subtraction; no dice |
-| Win | Last player holding a region; at the round limit, most regions |
+| Win | Take a rival's capital to knock it out; last player standing wins; at the round limit, most regions |
 | Live Arena | Replaced. Its code is removed from the branch and kept in git history |
 | Reused from Live Arena | Seats and colours, SSE route, matches table, lobby, replay page |
 
@@ -57,16 +57,17 @@ from a seed.
 
 | Size | Radius | Land regions | Cities | Default for | Round limit |
 | --- | --- | --- | --- | --- | --- |
-| Small | 3 | ~33 | 3 | 2–3 players | 25 |
-| Medium | 4 | ~55 | 5 | 4–5 players | 30 |
-| Large | 5 | ~82 | 7 | 6 players | 40 |
+| Small | 3 | ~33 | 3 | 2–3 players | 30 |
+| Medium | 4 | ~55 | 5 | 4–5 players | 40 |
+| Large | 5 | ~82 | 7 | 6 players | 50 |
 
-**Start.** Each player starts with one region holding 6 troops. Starts are
-spaced evenly around the edge. Every other region starts neutral with 2
-troops, and each city starts with 4.
+**Start.** Each player starts with one region holding 6 troops: its
+**capital**. Starts are spaced evenly around the edge. Capitals defend and
+pay like cities, on top of the neutral cities in the table. Every other
+region starts neutral with 2 troops, and each neutral city starts with 4.
 
 **Income.** At the start of each round, every living player earns
-`3 + floor(regions / 3) + 2 per city held` new troops.
+`3 + floor(regions / 2) + 2 per city or capital held` new troops.
 
 **Orders.** Each round a player picks exactly one order.
 - **Attack** a neighbouring enemy or neutral region from one of its own
@@ -90,9 +91,16 @@ troops, and each city starts with 4.
    - If it is 0 or less, the defenders hold with what's left, minimum 1.
    - Cities defend at 1.5×, rounded down.
 5. **Income** is added to each attacking player's source region.
-6. A player with no regions left is **eliminated**.
+6. **Borders grow.** Every empty non-city region that touches exactly one
+   player's territory joins that player with 1 troop. Neutral cities, and
+   land two players both touch, must still be attacked.
+7. **Capitals fall.** A player whose capital was taken is out, and every
+   region it holds goes to the captor. If two capitals fall in the same
+   round, they are settled in seat order, so a captor can win its own
+   capital straight back.
+8. A player with no regions left is **eliminated**.
 
-**Winning.** When only one player holds any regions, that player wins.
+**Winning.** When only one player is left, that player wins.
 At the round limit, the winner is the player with the most regions, then
 the most troops, then whoever reached that region count first. A match
 always has exactly one winner.
@@ -122,16 +130,22 @@ Map, one line per region (owner troops, * = city, neighbours):
 Last round: Red took D6 from Green (9 vs 4). Green reinforced E2 (+10).
 ```
 
-**Options.** Up to 8, with ids chosen by the server:
-- `A1`–`A6`: the six best attacks, ranked by margin. Each is described by
-  its outcome:
+**Options.** Up to 9, with ids chosen by the server:
+- `A1`–`A6`: the six best attacks. Attacks on a rival capital come first,
+  then the rest by margin. Each is described by its outcome, and a capital
+  attack also says that taking it knocks the rival out and hands over its
+  regions:
   ```
   A1: Attack Red's city C3 (5 troops, defends as 7) from C4 with 11.
       Takes it with 4 left if Red doesn't move. Red's C2 (11) borders C3
       and could reinforce it to 19 or strike C4 head-on.
       C4 keeps 1 + 7 income; Green's D3 (4) borders it.
   ```
-- `R1`, `R2`: reinforce the two most threatened regions:
+- `R3` (when it applies): **staging**. Reinforce the region next to a
+  rival capital that is in reach but too strong to take this round, with
+  what that region could attack with next round.
+- `R1`, `R2`: reinforce the two most threatened regions (the player's own
+  capital counts as more threatened than its numbers alone say):
   ```
   R1: Reinforce C4 (12) with 14 → 26. No attack this round.
       Biggest threat: Red's C2 (11).
@@ -219,18 +233,42 @@ The code follows the existing patterns and replaces Live Arena's files:
 
 ## Estimates
 
-Up to 40 rounds × 6 players = 240 calls. Each call is roughly 1,500
-characters of instructions, one line per region (~60 characters × 82) and
-8 options, so about 2,000 tokens. A Large 6-player match is therefore
-around 0.5M tokens at most; a Small 2-player match is about 40k. At
-roughly 2–5 seconds per round, a match takes 1–3 minutes.
+Measured on demo-bot matches (tokens counted as characters / 4):
+
+| Match | Tokens per call | Tokens per match |
+| --- | --- | --- |
+| Small, 2 players | ~1,000 | ~46k |
+| Medium, 4 players | ~1,300 | ~145k |
+| Large, 6 players | ~1,700 | ~300k |
+
+At roughly 2–5 seconds per JEV round, a match takes 1–4 minutes.
+
+## Tuning
+
+The first rules never produced a knockout: across 100 simulated demo-bot
+matches, every one ran to the round limit, because taking land one region
+per round left no time to finish anyone. These changes were made during
+the build:
+
+| Change | Why |
+| --- | --- |
+| Capitals: losing yours knocks you out and hands your land to the captor | Lets one well-timed strike end a player |
+| Borders grow into land only one player touches | Skips the empty land-grab phase; fronts form within a few rounds |
+| Income is `regions / 2` instead of `/ 3` | Bigger armies, so fortified capitals can be broken |
+| A staging reinforce next to a rival capital | Gives a way to build up for a strike |
+| Round limits 30 / 40 / 50 instead of 25 / 30 / 40 | Leaves time to finish once fronts meet |
+
+With these changes, demo-bot matches end by knockout 35–75% of the time,
+depending on size, and a 6-player match knocks out 3–4 of its 5 losers
+on average. Tried and dropped: starting each player with the land around
+its capital, and a weaker Reinforce (1.5× income); neither changed the
+outcome.
 
 ## Open questions
 
-- **Balance.** The income formula, the 1.5× city defence and the round
-  limits are first guesses. Tuning them needs demo-bot matches and a few
-  real JEV matches.
-- **Option count.** Eight options may leave out a clever attack. A
+- **Balance with JEV.** The tuning above was done against the demo bot.
+  Real JEV matches may play more cautiously or more aggressively.
+- **Option count.** Nine options may leave out a clever attack. A
   version with every attack listed (up to about 20) could be tried later.
 - **Later:** alliances or messages, and mixed seats (other models or
   bots).
