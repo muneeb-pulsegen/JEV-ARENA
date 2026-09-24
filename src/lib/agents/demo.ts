@@ -81,6 +81,17 @@ function sorterGate(state: string): string {
   return gateFor({ color, size: size ?? null }, tier, rotation);
 }
 
+/** Live Arena: the non-FATAL option with the most Room, ties by option order. `slip` picks the runner-up instead. */
+export function arenaMove(choices: Choices, slip = false): string {
+  const ids = Object.keys(choices);
+  const safe = ids
+    .filter((id) => !choices[id].includes("FATAL"))
+    .map((id) => ({ id, room: Number(choices[id].match(/Room after this move: (\d+)/)?.[1] ?? 0) }))
+    .sort((a, z) => z.room - a.room);
+  if (!safe.length) return ids[0] ?? "";
+  return (slip && safe.length > 1 && safe[1].room > 0 ? safe[1] : safe[0]).id;
+}
+
 /**
  * A scripted player for free demo runs. With `sloppy`, it slips now and then
  * so demos show failures too.
@@ -89,6 +100,12 @@ export function createDemoAgent(opts: { delayMs?: number; sloppy?: boolean; rand
   const { delayMs = 450, sloppy = false, random = Math.random } = opts;
   return {
     async decide(instructions, state, choices, { signal }) {
+      if (instructions.includes("Live Arena")) {
+        // Uneven pacing and the odd second-best pick, so demo matches don't all play out alike.
+        await new Promise((r) => setTimeout(r, sloppy ? delayMs * (0.5 + random()) : delayMs));
+        signal?.throwIfAborted();
+        return { choice: arenaMove(choices, sloppy && random() < 0.08), confidence: 1, inputTokens: 0, outputTokens: 0 };
+      }
       await new Promise((r) => setTimeout(r, delayMs));
       signal?.throwIfAborted();
       let choice: string;

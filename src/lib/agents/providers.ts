@@ -98,7 +98,11 @@ const sleep = (ms: number, signal?: AbortSignal) =>
     }, { once: true });
   });
 
-export function withRetries(agent: Agent, onRetry?: (err: ProviderError, attempt: number, waitMs: number) => void): Agent {
+export function withRetries(
+  agent: Agent,
+  onRetry?: (err: ProviderError, attempt: number, waitMs: number) => void,
+  wait: (ms: number, signal?: AbortSignal) => Promise<void> = sleep,
+): Agent {
   return {
     async decide(instructions: string, state: string, choices: Choices, opts): Promise<Decision> {
       let waitedMs = 0;
@@ -114,7 +118,7 @@ export function withRetries(agent: Agent, onRetry?: (err: ProviderError, attempt
           const base = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)] * (rateLimited ? 2 : 1);
           const waitMs = Math.min(MAX_WAIT_MS, e.retryAfterMs !== undefined ? e.retryAfterMs + 250 + Math.random() * 1000 : base);
           onRetry?.(e, attempt + 1, waitMs);
-          await sleep(waitMs, opts.signal);
+          await wait(waitMs, opts.signal);
           waitedMs += performance.now() - started;
         }
       }
