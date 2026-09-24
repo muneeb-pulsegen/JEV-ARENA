@@ -23,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <nav className="nav">
               <Link href="/">Play</Link>
+              <Link href="/arena">Arena</Link>
               <Link href="/leaderboard">Leaderboard</Link>
             </nav>
           </header>
