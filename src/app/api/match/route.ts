@@ -1,4 +1,4 @@
-import { handleMatchRequest } from "@/lib/arena/serve";
+import { handleMatchRequest } from "@/lib/frontline/serve";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

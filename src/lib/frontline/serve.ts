@@ -2,21 +2,21 @@ import { randomInt } from "node:crypto";
 import { createAgent } from "../agents/providers";
 import { PROVIDERS, type Agent, type AgentConfig, type ProviderId } from "../agents/types";
 import { saveMatch } from "../db";
-import { defaultSize, MAX_SEATS, MIN_SEATS, SIZES, type SizeId } from "./config";
+import { defaultSize, MAX_PLAYERS, MIN_PLAYERS, SIZES, type SizeId } from "./config";
 import { runMatch, type Clock, type MatchEvent } from "./match";
 
-/** Each match keeps up to six calls in flight on one key. */
+/** Each round keeps up to six calls in flight on one key. */
 export const MAX_CONCURRENT_MATCHES = 2;
 let activeMatches = 0;
 
 /** Overridable only by tests. */
-export type MatchDeps = { makeAgent?: (cfg: AgentConfig) => Agent; paceMs?: number; clock?: Clock };
+export type MatchDeps = { makeAgent?: (cfg: AgentConfig) => Agent; clock?: Clock };
 
 type Body = { provider?: string; apiKey?: string; seats?: unknown; size?: string };
 
 const bad = (message: string, status = 400) => Response.json({ error: message }, { status });
 
-/** POST /api/match: validates the setup, then streams the live match as server-sent events and saves it when it ends. */
+/** POST /api/match: validates the setup, then streams a Frontline match as server-sent events and saves it when it ends. */
 export async function handleMatchRequest(req: Request, deps: MatchDeps = {}): Promise<Response> {
   let body: Body;
   try {
@@ -28,8 +28,8 @@ export async function handleMatchRequest(req: Request, deps: MatchDeps = {}): Pr
   const provider = body.provider as ProviderId;
   if (!provider || !(provider in PROVIDERS)) return bad("Unknown provider.");
   const seats = body.seats;
-  if (typeof seats !== "number" || !Number.isInteger(seats) || seats < MIN_SEATS || seats > MAX_SEATS) {
-    return bad(`Choose ${MIN_SEATS} to ${MAX_SEATS} players.`);
+  if (typeof seats !== "number" || !Number.isInteger(seats) || seats < MIN_PLAYERS || seats > MAX_PLAYERS) {
+    return bad(`Choose ${MIN_PLAYERS} to ${MAX_PLAYERS} players.`);
   }
   const size = (body.size ?? defaultSize(seats)) as SizeId;
   if (!(size in SIZES)) return bad("Unknown map size.");
@@ -72,15 +72,16 @@ export async function handleMatchRequest(req: Request, deps: MatchDeps = {}): Pr
           emit,
           signal: abort.signal,
           clock: deps.clock,
-          paceMs: deps.paceMs,
         });
         const saved = saveMatch({
+          game: "frontline",
           provider,
           seed: result.seed,
           size,
           seats,
           winner: result.winner,
           endReason: result.reason,
+          rounds: result.rounds,
           durationMs: result.durationMs,
           tokensIn: result.tokens.input,
           tokensOut: result.tokens.output,

@@ -81,15 +81,36 @@ function sorterGate(state: string): string {
   return gateFor({ color, size: size ?? null }, tier, rotation);
 }
 
-/** Live Arena: the non-FATAL option with the most Room, ties by option order. `slip` picks the runner-up instead. */
-export function arenaMove(choices: Choices, slip = false): string {
+/**
+ * Frontline: the attack that captures with the most left over, discounted when the
+ * target's owner could reinforce it or the source would be left open, and a bonus
+ * for cities and, above all, rival capitals. Reinforces its most threatened region when no attack is worth it.
+ * `slip` takes the runner-up instead.
+ */
+export function frontlineOrder(choices: Choices, slip = false): string {
   const ids = Object.keys(choices);
-  const safe = ids
-    .filter((id) => !choices[id].includes("FATAL"))
-    .map((id) => ({ id, room: Number(choices[id].match(/Room after this move: (\d+)/)?.[1] ?? 0) }))
-    .sort((a, z) => z.room - a.room);
-  if (!safe.length) return ids[0] ?? "";
-  return (slip && safe.length > 1 && safe[1].room > 0 ? safe[1] : safe[0]).id;
+  const scored = ids
+    .filter((id) => id.startsWith("A"))
+    .flatMap((id) => {
+      const text = choices[id];
+      const left = text.match(/Takes it with (\d+) left/);
+      if (!left) return [];
+      let score = Number(left[1]);
+      const reinforce = text.match(/can reinforce \S+ by up to (\d+)/);
+      if (reinforce) score -= Number(reinforce[1]) / 2;
+      const keeps = text.match(/keeps 1 \+ (\d+) income\. (?:\S+ \S+ could attack it with (\d+))?/);
+      if (keeps?.[2] && Number(keeps[2]) > 1 + Number(keeps[1])) score -= 4;
+      if (/knocks \S+ out/.test(text)) score += 15;
+      else if (/Attack \S+ city /.test(text) || /Attack neutral city /.test(text)) score += 3;
+      return score > 0 ? [{ id, score }] : [];
+    })
+    .sort((a, z) => z.score - a.score);
+  // Build up for a capital strike when one more reinforce would carry it, unless a capital falls right now.
+  const stage = choices.R3?.match(/could attack it with (\d+), before/);
+  const defends = choices.R3?.match(/defends as (\d+)\)/);
+  if (stage && defends && Number(stage[1]) > Number(defends[1]) + 2 && !scored.some((x) => x.score >= 15)) return "R3";
+  const pick = slip && scored.length > 1 ? scored[1] : scored[0];
+  return pick?.id ?? (ids.includes("R1") ? "R1" : ids[0] ?? "");
 }
 
 /**
@@ -100,11 +121,11 @@ export function createDemoAgent(opts: { delayMs?: number; sloppy?: boolean; rand
   const { delayMs = 450, sloppy = false, random = Math.random } = opts;
   return {
     async decide(instructions, state, choices, { signal }) {
-      if (instructions.includes("Live Arena")) {
+      if (instructions.includes("Frontline")) {
         // Uneven pacing and the odd second-best pick, so demo matches don't all play out alike.
         await new Promise((r) => setTimeout(r, sloppy ? delayMs * (0.5 + random()) : delayMs));
         signal?.throwIfAborted();
-        return { choice: arenaMove(choices, sloppy && random() < 0.08), confidence: 1, inputTokens: 0, outputTokens: 0 };
+        return { choice: frontlineOrder(choices, sloppy && random() < 0.1), confidence: 1, inputTokens: 0, outputTokens: 0 };
       }
       await new Promise((r) => setTimeout(r, delayMs));
       signal?.throwIfAborted();

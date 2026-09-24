@@ -2,9 +2,9 @@ import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import type { SeatResult } from "./arena/board";
-import type { SizeId } from "./arena/config";
-import type { MatchEvent } from "./arena/match";
+import type { SizeId } from "./frontline/config";
+import type { MatchEvent } from "./frontline/match";
+import type { Standing } from "./frontline/rules";
 import type { GameId } from "./games";
 
 export type LeaderboardEntry = {
@@ -52,12 +52,14 @@ function open() {
   db.exec(`CREATE TABLE IF NOT EXISTS matches (
     id TEXT PRIMARY KEY,
     created_at TEXT NOT NULL,
+    game TEXT NOT NULL,
     provider TEXT NOT NULL,
     seed INTEGER NOT NULL,
     size TEXT NOT NULL,
     seats INTEGER NOT NULL,
     winner INTEGER NOT NULL,
     end_reason TEXT NOT NULL,
+    rounds INTEGER NOT NULL,
     duration_ms INTEGER NOT NULL,
     tokens_in INTEGER NOT NULL,
     tokens_out INTEGER NOT NULL,
@@ -100,16 +102,18 @@ export function listRuns(limit = 100): LeaderboardEntry[] {
 export type MatchSummary = {
   id: string;
   createdAt: string;
+  game: string;
   provider: string;
   seed: number;
   size: SizeId;
   seats: number;
   winner: number;
-  endReason: "last" | "time";
+  endReason: "last" | "limit";
+  rounds: number;
   durationMs: number;
   tokensIn: number;
   tokensOut: number;
-  results: SeatResult[];
+  results: Standing[];
 };
 
 export type MatchRecord = MatchSummary & { log: MatchEvent[] };
@@ -118,8 +122,8 @@ export function saveMatch(m: Omit<MatchRecord, "id" | "createdAt">): MatchSummar
   const entry = { ...m, id: randomUUID(), createdAt: new Date().toISOString() };
   open()
     .prepare(
-      `INSERT INTO matches VALUES (@id, @createdAt, @provider, @seed, @size, @seats, @winner, @endReason, @durationMs,
-        @tokensIn, @tokensOut, @results, @log)`,
+      `INSERT INTO matches (id, created_at, game, provider, seed, size, seats, winner, end_reason, rounds, duration_ms, tokens_in, tokens_out, results, log)
+        VALUES (@id, @createdAt, @game, @provider, @seed, @size, @seats, @winner, @endReason, @rounds, @durationMs, @tokensIn, @tokensOut, @results, @log)`,
     )
     .run({ ...entry, results: JSON.stringify(entry.results), log: JSON.stringify(entry.log) });
   const { log: _log, ...summary } = entry;
@@ -129,6 +133,7 @@ export function saveMatch(m: Omit<MatchRecord, "id" | "createdAt">): MatchSummar
 const toSummary = (r: Record<string, any>): MatchSummary => ({
   id: r.id,
   createdAt: r.created_at,
+  game: r.game,
   provider: r.provider,
   seed: r.seed,
   size: r.size,
@@ -139,11 +144,12 @@ const toSummary = (r: Record<string, any>): MatchSummary => ({
   tokensIn: r.tokens_in,
   tokensOut: r.tokens_out,
   results: JSON.parse(r.results),
+  rounds: r.rounds,
 });
 
 export function listMatches(limit = 20): MatchSummary[] {
   const rows = open()
-    .prepare(`SELECT id, created_at, provider, seed, size, seats, winner, end_reason, duration_ms, tokens_in, tokens_out, results
+    .prepare(`SELECT id, created_at, game, provider, seed, size, seats, winner, end_reason, rounds, duration_ms, tokens_in, tokens_out, results
       FROM matches ORDER BY created_at DESC LIMIT ?`)
     .all(limit) as Record<string, any>[];
   return rows.map(toSummary);

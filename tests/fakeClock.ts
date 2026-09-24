@@ -1,4 +1,4 @@
-import type { Clock } from "@/lib/arena/match";
+import type { Clock } from "@/lib/frontline/match";
 
 /**
  * Virtual time for match tests. Whenever nothing else is pending, the clock
