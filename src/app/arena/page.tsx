@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { serverKey } from "@/lib/agents/providers";
 import { PROVIDERS, type ProviderId } from "@/lib/agents/types";
-import { SIZES } from "@/lib/frontline/config";
+import { SIZES, type SizeId } from "@/lib/frontline/config";
+import type { Standing } from "@/lib/frontline/rules";
 import { listMatches } from "@/lib/db";
 import FrontlineLobby from "./FrontlineLobby";
 
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default function FrontlinePage() {
   const providers = Object.entries(PROVIDERS).map(([id, p]) => ({ id, label: p.label, serverKey: !!serverKey(id as ProviderId) }));
-  const matches = listMatches(20).filter((m) => m.game === "frontline");
+  const matches = listMatches<Standing>("frontline", 20);
   return (
     <>
       <h1>Frontline</h1>
@@ -50,7 +51,7 @@ export default function FrontlinePage() {
                           {m.results.map((r) => <i key={r.id} style={{ background: `var(--seat-${r.id})` }} />)}
                         </span>
                       </td>
-                      <td className="sub">{SIZES[m.size]?.label ?? m.size}</td>
+                      <td className="sub">{SIZES[m.size as SizeId]?.label ?? m.size}</td>
                       <td className="sub">{m.endReason === "last" ? "last standing" : "round limit"}</td>
                       <td className="num sub">{m.rounds}</td>
                       <td className="sub">{new Date(m.createdAt).toISOString().slice(0, 16).replace("T", " ")}</td>

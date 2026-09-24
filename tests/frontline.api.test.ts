@@ -4,7 +4,7 @@ import { jevAgent } from "@/lib/agents/providers";
 import type { Agent } from "@/lib/agents/types";
 import { runMatch, type MatchEvent } from "@/lib/frontline/match";
 import { replayTo } from "@/lib/frontline/replay";
-import { standings } from "@/lib/frontline/rules";
+import { standings, type Standing } from "@/lib/frontline/rules";
 import { handleMatchRequest } from "@/lib/frontline/serve";
 import { getMatch, listMatches } from "@/lib/db";
 import { startFakeProvider } from "./fakeProvider";
@@ -66,23 +66,24 @@ describe("POST /api/match", () => {
     const saved = events.at(-1) as Extract<MatchEvent, { type: "saved" }>;
     expect(saved.type).toBe("saved");
 
-    const match = getMatch(saved.id)!;
+    const match = getMatch<Standing, MatchEvent>(saved.id)!;
     expect(match).toMatchObject({ game: "frontline", provider: "demo", size: "small", seats: 3, winner: end.winner, endReason: end.reason, rounds: end.rounds });
     expect(match.results).toEqual(end.standings);
     expect(standings(replayTo(match.log).state, match.winner)).toEqual(match.results);
-    expect(listMatches().map((m) => m.id)).toContain(saved.id);
+    expect(listMatches("frontline").map((m) => m.id)).toContain(saved.id);
+    expect(listMatches("dominion").map((m) => m.id)).not.toContain(saved.id);
     expect(getMatch("missing")).toBeNull();
   });
 
   it("discards a match the viewer abandons", async () => {
-    const before = listMatches().length;
+    const before = listMatches("frontline").length;
     const ctrl = new AbortController();
     const slow = { makeAgent: () => createDemoAgent({ delayMs: 20 }) };
     const res = await handleMatchRequest(post({ provider: "demo", seats: 2 }, ctrl.signal), slow);
     let moves = 0;
     await readEvents(res, (e) => e.type === "reveal" && ++moves === 3 && ctrl.abort());
     await new Promise((r) => setTimeout(r, 100));
-    expect(listMatches()).toHaveLength(before);
+    expect(listMatches("frontline")).toHaveLength(before);
   });
 
   it("turns away a third match while two are running", async () => {

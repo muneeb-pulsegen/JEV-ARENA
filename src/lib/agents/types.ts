@@ -4,9 +4,22 @@ export type Choices = Record<string, string>;
 /** `waitedMs` is time spent backing off between retries, which no game's clock counts. */
 export type Decision = { choice: string; confidence: number; inputTokens: number; outputTokens: number; waitedMs?: number };
 
+/** One named Choice question in a multi-question call. */
+export type QuestionSpec = { instructions: string; choices: Choices };
+
+/** Answers to a multi-question call, keyed like the questions. A question can be missing from `answers`. */
+export type ManyDecision = {
+  answers: Record<string, { choice: string; confidence: number }>;
+  inputTokens: number;
+  outputTokens: number;
+  waitedMs?: number;
+};
+
 export interface Agent {
   /** `instructions` is the fixed game-rules text; `state` is the current turn's context. */
   decide(instructions: string, state: string, choices: Choices, opts: { signal?: AbortSignal }): Promise<Decision>;
+  /** Several independent questions about one shared state, answered in a single call. Optional; see `askMany`. */
+  decideMany?(state: string, questions: Record<string, QuestionSpec>, opts: { signal?: AbortSignal }): Promise<ManyDecision>;
 }
 
 export const PROVIDERS = {

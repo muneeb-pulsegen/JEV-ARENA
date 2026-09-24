@@ -29,13 +29,13 @@ export async function startFakeProvider(opts: { failFirst?: number; failStatus?:
       }
 
       if (req.url === "/v1/systemone") {
-        const q = body.questions.move;
-        const r = await demo.decide(q.instructions, body.state, q.criteria, {});
-        return send(200, {
-          model: "jev-1.0.0",
-          answers: { move: { type: "choice", choice: r.choice, confidence: r.confidence, probabilities: {} } },
-          usage: { input_tokens: 11, output_tokens: 3 },
-        });
+        // Every named question is answered independently, as the real API does.
+        const answers: Record<string, unknown> = {};
+        for (const [key, q] of Object.entries(body.questions as Record<string, any>)) {
+          const r = await demo.decide(q.instructions, body.state, q.criteria, {});
+          answers[key] = { type: "choice", choice: r.choice, confidence: r.confidence, probabilities: {} };
+        }
+        return send(200, { model: "jev-1.0.0", answers, usage: { input_tokens: 11, output_tokens: 3 } });
       }
       send(404, { detail: { error_type: "not_found", message: "not found" } });
     });

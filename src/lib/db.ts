@@ -2,9 +2,6 @@ import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import type { SizeId } from "./frontline/config";
-import type { MatchEvent } from "./frontline/match";
-import type { Standing } from "./frontline/rules";
 import type { GameId } from "./games";
 
 export type LeaderboardEntry = {
@@ -99,26 +96,28 @@ export function listRuns(limit = 100): LeaderboardEntry[] {
   }));
 }
 
-export type MatchSummary = {
+/** A saved match of any game. `results` and `log` are that game's standings and events. */
+export type MatchSummary<R = { id: string; name: string }> = {
   id: string;
   createdAt: string;
   game: string;
   provider: string;
   seed: number;
-  size: SizeId;
+  size: string;
   seats: number;
   winner: number;
-  endReason: "last" | "limit";
+  /** How the match ended, in the game's own terms. */
+  endReason: string;
   rounds: number;
   durationMs: number;
   tokensIn: number;
   tokensOut: number;
-  results: Standing[];
+  results: R[];
 };
 
-export type MatchRecord = MatchSummary & { log: MatchEvent[] };
+export type MatchRecord<R = { id: string; name: string }, E = unknown> = MatchSummary<R> & { log: E[] };
 
-export function saveMatch(m: Omit<MatchRecord, "id" | "createdAt">): MatchSummary {
+export function saveMatch<R, E>(m: Omit<MatchRecord<R, E>, "id" | "createdAt">): MatchSummary<R> {
   const entry = { ...m, id: randomUUID(), createdAt: new Date().toISOString() };
   open()
     .prepare(
@@ -130,7 +129,7 @@ export function saveMatch(m: Omit<MatchRecord, "id" | "createdAt">): MatchSummar
   return summary;
 }
 
-const toSummary = (r: Record<string, any>): MatchSummary => ({
+const toSummary = <R>(r: Record<string, any>): MatchSummary<R> => ({
   id: r.id,
   createdAt: r.created_at,
   game: r.game,
@@ -147,15 +146,15 @@ const toSummary = (r: Record<string, any>): MatchSummary => ({
   rounds: r.rounds,
 });
 
-export function listMatches(limit = 20): MatchSummary[] {
+export function listMatches<R = { id: string; name: string }>(game: string, limit = 20): MatchSummary<R>[] {
   const rows = open()
     .prepare(`SELECT id, created_at, game, provider, seed, size, seats, winner, end_reason, rounds, duration_ms, tokens_in, tokens_out, results
-      FROM matches ORDER BY created_at DESC LIMIT ?`)
-    .all(limit) as Record<string, any>[];
-  return rows.map(toSummary);
+      FROM matches WHERE game = ? ORDER BY created_at DESC LIMIT ?`)
+    .all(game, limit) as Record<string, any>[];
+  return rows.map((r) => toSummary<R>(r));
 }
 
-export function getMatch(id: string): MatchRecord | null {
+export function getMatch<R = { id: string; name: string }, E = unknown>(id: string): MatchRecord<R, E> | null {
   const r = open().prepare(`SELECT * FROM matches WHERE id = ?`).get(id) as Record<string, any> | undefined;
-  return r ? { ...toSummary(r), log: JSON.parse(r.log) } : null;
+  return r ? { ...toSummary<R>(r), log: JSON.parse(r.log) } : null;
 }
