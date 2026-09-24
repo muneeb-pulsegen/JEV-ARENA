@@ -21,6 +21,13 @@
   --seat-V: #8a4bd6;
   --seat-T: #0e9494;
   --neutral-hex: #bdb8ab;
+  --t-grassland: #9cc56b;
+  --t-plains: #d4c27a;
+  --t-forest: #5e9a52;
+  --t-hills: #b59a6a;
+  --t-desert: #e6d3a0;
+  --t-lake: #7fb6dd;
+  --t-mountain: #9a968c;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: light;
@@ -50,6 +57,13 @@
     --seat-V: #b98bf0;
     --seat-T: #3fd1cc;
     --neutral-hex: #5b5950;
+    --t-grassland: #4f7a3a;
+    --t-plains: #86794a;
+    --t-forest: #33592e;
+    --t-hills: #6f5d40;
+    --t-desert: #93845c;
+    --t-lake: #2f5f84;
+    --t-mountain: #5e5b54;
     color-scheme: dark;
   }
 }
@@ -286,6 +300,52 @@ h2 { font-size: 16px; margin: 0 0 10px; }
 .legend span { display: inline-flex; align-items: center; gap: 5px; }
 .lg-capital { width: 9px; height: 9px; background: var(--ink); clip-path: polygon(0 0, 100% 35%, 0 70%); display: inline-block; }
 .lg-city { width: 7px; height: 9px; background: #8d8878; display: inline-block; }
+
+/* Dominion world map */
+.dm-board { width: 100%; height: auto; display: block; margin: 0 auto; overflow: visible; }
+.dm-hex { --tc: var(--t-grassland); }
+.dm-hex.t-plains { --tc: var(--t-plains); }
+.dm-hex.t-forest { --tc: var(--t-forest); }
+.dm-hex.t-hills { --tc: var(--t-hills); }
+.dm-hex.t-desert { --tc: var(--t-desert); }
+.dm-hex.t-lake { --tc: var(--t-lake); }
+.dm-hex.t-mountain { --tc: var(--t-mountain); }
+.dm-hex .top { fill: var(--tc); stroke: color-mix(in srgb, var(--tc) 70%, #000); stroke-width: 0.5; }
+.dm-hex .s-l, .dm-hex .s-r { fill: color-mix(in srgb, var(--tc) 72%, #000); }
+.dm-hex .s-bl { fill: color-mix(in srgb, var(--tc) 85%, #000); }
+.dm-hex .s-br { fill: color-mix(in srgb, var(--tc) 60%, #000); }
+.dm-peak { fill: color-mix(in srgb, var(--t-mountain) 80%, #fff); stroke: color-mix(in srgb, var(--t-mountain) 50%, #000); stroke-width: 0.6; }
+.dm-trees polygon { fill: color-mix(in srgb, var(--t-forest) 70%, #000); }
+.dm-res { font-size: 8px; font-weight: 800; text-anchor: middle; fill: #fff; stroke: rgba(0, 0, 0, 0.55); stroke-width: 2px; paint-order: stroke; pointer-events: none; }
+.dm-land { fill: color-mix(in srgb, var(--sc) 28%, transparent); pointer-events: none; }
+.dm-border { fill: none; stroke: var(--sc); stroke-width: 2.2; stroke-linecap: round; pointer-events: none; }
+.dm-house { fill: color-mix(in srgb, var(--sc) 55%, #fff); stroke: color-mix(in srgb, var(--sc) 60%, #000); stroke-width: 0.8; }
+.dm-crown { fill: #f2c14e; stroke: #8a6a10; stroke-width: 0.6; }
+.dm-walls { fill: none; stroke: #6d675a; stroke-width: 2.2; }
+.dm-walls.castle { stroke-width: 3.4; stroke-dasharray: 3 1.5; }
+.dm-pop { fill: var(--sc); stroke: #fff; stroke-width: 1; }
+.dm-pop-n, .dm-army-n, .dm-settler text { font-size: 8px; font-weight: 800; text-anchor: middle; fill: #fff; pointer-events: none; }
+.dm-name { font-size: 8px; font-weight: 700; text-anchor: middle; fill: var(--ink); stroke: var(--bg); stroke-width: 2.4px; paint-order: stroke; pointer-events: none; }
+.dm-army line { stroke: var(--ink); stroke-width: 1.2; }
+.dm-army polygon { fill: var(--sc); stroke: rgba(0, 0, 0, 0.55); stroke-width: 0.6; }
+.dm-army-n-bg { fill: color-mix(in srgb, var(--sc) 70%, #000); stroke: #fff; stroke-width: 1; }
+.dm-army.fortified .dm-army-n-bg { stroke: #f2c14e; stroke-width: 1.8; }
+.dm-settler circle { fill: var(--sc); stroke: #fff; stroke-width: 1; }
+.dm-grid { grid-template-columns: minmax(0, 1fr) 330px; }
+@media (max-width: 900px) { .dm-grid { grid-template-columns: minmax(0, 1fr); } }
+.civ-cards { display: grid; grid-template-columns: 1fr; gap: 8px; }
+@media (max-width: 900px) and (min-width: 560px) { .civ-cards { grid-template-columns: 1fr 1fr; } }
+.civ-card dl { grid-template-columns: repeat(5, 1fr); }
+.civ-card dd small { font-size: 10px; color: var(--ink-2); font-weight: 500; margin-left: 2px; }
+.civ-card header .hint { margin-left: 4px; }
+.civ-line { font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }
+.civ-line.wonders { color: var(--warn); font-weight: 600; }
+.civ-decisions { list-style: none; margin: 4px 0 0; padding: 0; font-size: 11.5px; color: var(--ink-2); display: flex; flex-direction: column; gap: 1px; }
+.civ-decisions li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.civ-decisions li.fallback { color: var(--warn); }
+.dm-standings li { grid-template-columns: 1.5ch 10px 6ch 9ch minmax(0, 1fr); }
+.feed li.wonder { font-weight: 600; }
+.feed li.tech { color: var(--ink-2); }
 
 .timeline { display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 12px; }
 .timeline input { flex: 1; min-width: 0; accent-color: var(--ink); }

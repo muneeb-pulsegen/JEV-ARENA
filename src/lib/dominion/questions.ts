@@ -103,7 +103,8 @@ function recommendBuild(m: GameMap, s: State, c: City, size: SizeId, see: Set<nu
   if (unitCount(c.garrison) === 0) return { kind: "unit", unit: bestUnit(m, s, c, DEFENDERS) };
   const target = { small: 4, medium: 5, large: 5 }[size];
   const expanding = cities.length + s.settlers.filter((st) => st.owner === p).length + s.cities.filter((x) => x.owner === p && x.build?.kind === "settler").length;
-  if (expanding < target && c.pop >= SETTLER.minPop && c.build?.kind !== "settler") return { kind: "settler" };
+  const openSite = m.q.some((_, i) => (s.players[p].seen[i] || s.owner[i] === p) && validSite(m, s, i, p) && steps(m, c.hex, i) <= 8);
+  if (expanding < target && openSite && c.pop >= SETTLER.minPop && c.build?.kind !== "settler") return { kind: "settler" };
   if (!cannotBuild(m, s, c, { kind: "building", building: "observatory" })) return { kind: "building", building: "observatory" };
   for (const b of ["granary", "workshop"] as const) if (!cannotBuild(m, s, c, { kind: "building", building: b })) return { kind: "building", building: b };
   // Keep a standing army that grows over the game; siege engines once the army has none.
